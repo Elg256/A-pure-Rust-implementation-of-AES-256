@@ -21,7 +21,26 @@ const S_BOX: [[u8; 16]; 16] = [
     [0x8c, 0xa1, 0x89, 0x0d, 0xbf, 0xe6, 0x42, 0x68, 0x41, 0x99, 0x2d, 0x0f, 0xb0, 0x54, 0xbb, 0x16],
 ];
 
+const INV_S_BOX: [[u8;16];16] = [
+    [0x52, 0x09, 0x6a, 0xd5, 0x30, 0x36, 0xa5, 0x38, 0xbf, 0x40, 0xa3, 0x9e, 0x81, 0xf3, 0xd7, 0xfb],
+    [0x7c, 0xe3, 0x39, 0x82, 0x9b, 0x2f, 0xff, 0x87, 0x34, 0x8e, 0x43, 0x44, 0xc4, 0xde, 0xe9, 0xcb],
+    [0x54, 0x7b, 0x94, 0x32, 0xa6, 0xc2, 0x23, 0x3d, 0xee, 0x4c, 0x95, 0x0b, 0x42, 0xfa, 0xc3, 0x4e],
+    [0x08, 0x2e, 0xa1, 0x66, 0x28, 0xd9, 0x24, 0xb2, 0x76, 0x5b, 0xa2, 0x49, 0x6d, 0x8b, 0xd1, 0x25],
+    [0x72, 0xf8, 0xf6, 0x64, 0x86, 0x68, 0x98, 0x16, 0xd4, 0xa4, 0x5c, 0xcc, 0x5d, 0x65, 0xb6, 0x92],
+    [0x6c, 0x70, 0x48, 0x50, 0xfd, 0xed, 0xb9, 0xda, 0x5e, 0x15, 0x46, 0x57, 0xa7, 0x8d, 0x9d, 0x84],
+    [0x90, 0xd8, 0xab, 0x00, 0x8c, 0xbc, 0xd3, 0x0a, 0xf7, 0xe4, 0x58, 0x05, 0xb8, 0xb3, 0x45, 0x06],
+    [0xd0, 0x2c, 0x1e, 0x8f, 0xca, 0x3f, 0x0f, 0x02, 0xc1, 0xaf, 0xbd, 0x03, 0x01, 0x13, 0x8a, 0x6b],
+    [0x3a, 0x91, 0x11, 0x41, 0x4f, 0x67, 0xdc, 0xea, 0x97, 0xf2, 0xcf, 0xce, 0xf0, 0xb4, 0xe6, 0x73],
+    [0x96, 0xac, 0x74, 0x22, 0xe7, 0xad, 0x35, 0x85, 0xe2, 0xf9, 0x37, 0xe8, 0x1c, 0x75, 0xdf, 0x6e],
+    [0x47, 0xf1, 0x1a, 0x71, 0x1d, 0x29, 0xc5, 0x89, 0x6f, 0xb7, 0x62, 0x0e, 0xaa, 0x18, 0xbe, 0x1b],
+    [0xfc, 0x56, 0x3e, 0x4b, 0xc6, 0xd2, 0x79, 0x20, 0x9a, 0xdb, 0xc0, 0xfe, 0x78, 0xcd, 0x5a, 0xf4],
+    [0x1f, 0xdd, 0xa8, 0x33, 0x88, 0x07, 0xc7, 0x31, 0xb1, 0x12, 0x10, 0x59, 0x27, 0x80, 0xec, 0x5f],
+    [0x60, 0x51, 0x7f, 0xa9, 0x19, 0xb5, 0x4a, 0x0d, 0x2d, 0xe5, 0x7a, 0x9f, 0x93, 0xc9, 0x9c, 0xef],
+    [0xa0, 0xe0, 0x3b, 0x4d, 0xae, 0x2a, 0xf5, 0xb0, 0xc8, 0xeb, 0xbb, 0x3c, 0x83, 0x53, 0x99, 0x61],
+    [0x17, 0x2b, 0x04, 0x7e, 0xba, 0x77, 0xd6, 0x26, 0xe1, 0x69, 0x14, 0x63, 0x55, 0x21, 0x0c, 0x7d] ];
+
 const RCON: [u8; 14] = [0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80, 0x1B, 0x36, 0x6c, 0xd8, 0xab, 0x4d];
+
 
 
 fn generate_aes_key() -> [u8; 32] {
@@ -71,7 +90,7 @@ fn key_expansion(key: [u8; 32]) -> [[[u8; 4]; 4]; 15] {
         else{
             round_keys[i] = xor_words(round_keys[i - 8], round_keys[i - 1]);
         }
-        
+
     }
 
     let mut expanded_states = [[[0u8; 4]; 4]; 15];
@@ -93,10 +112,26 @@ fn find_s_box_sub(byte: u8) -> u8{
 
 }
 
+fn find_inv_s_box_sub(byte: u8) -> u8{
+    let row =  ((byte >> 4) & 0xF) as usize;
+    let col = (byte & 0xF) as usize;
+    return INV_S_BOX[row][col];
+
+}
+
 fn sub_bytes(mut state: [[u8; 4]; 4]) -> [[u8; 4]; 4]{
     for row in state.iter_mut() {
         for byte in row.iter_mut() {
             *byte = find_s_box_sub(*byte);
+        }
+    }
+    return state;
+}
+
+fn inv_sub_bytes(mut state: [[u8; 4]; 4]) -> [[u8; 4]; 4]{
+    for row in state.iter_mut() {
+        for byte in row.iter_mut() {
+            *byte = find_inv_s_box_sub(*byte);
         }
     }
     return state;
@@ -122,13 +157,11 @@ fn shift_row(mut state: [[u8; 4]; 4]) -> [[u8; 4]; 4]{
     state[2][1] = temp_state[3][1];
     state[3][1] = temp_state[0][1];
 
-    let temp_state = state.clone();
     state[0][2] = temp_state[2][2];
     state[1][2] = temp_state[3][2];
     state[2][2] = temp_state[0][2];
     state[3][2] = temp_state[1][2];
 
-    let temp_state = state.clone();
     state[0][3] = temp_state[3][3];
     state[1][3] = temp_state[0][3];
     state[2][3] = temp_state[1][3];
@@ -136,6 +169,29 @@ fn shift_row(mut state: [[u8; 4]; 4]) -> [[u8; 4]; 4]{
 
     return state;
 }
+
+fn inv_shift_row(mut state: [[u8; 4]; 4]) -> [[u8; 4]; 4]{
+    let temp_state = state.clone();
+
+    state[0][1] = temp_state[3][1];
+    state[1][1] = temp_state[0][1];
+    state[2][1] = temp_state[1][1];
+    state[3][1] = temp_state[2][1];
+
+    state[0][2] = temp_state[2][2];
+    state[1][2] = temp_state[3][2];
+    state[2][2] = temp_state[0][2];
+    state[3][2] = temp_state[1][2];
+
+    state[0][3] = temp_state[1][3];
+    state[1][3] = temp_state[2][3];
+    state[2][3] = temp_state[3][3];
+    state[3][3] = temp_state[0][3];
+
+    return state;
+}
+
+
 
 fn print_state(state: [[u8; 4]; 4]){
     for row in state.iter() {
@@ -182,6 +238,42 @@ fn galois_mul(mut num: u8, n: u8) -> u8{
      new_num = new_num ^ num;
     }
 
+    if n == 9{
+        new_num = num.clone();
+        for _i in 0..3{
+            new_num = double_in_galois_field(new_num);
+        }
+
+        new_num = new_num ^ num;
+    }
+
+    if n == 11{
+        new_num = num.clone();
+        for _i in 0..2{
+            new_num = double_in_galois_field(new_num);
+        }
+        new_num = new_num ^ num;
+        new_num = double_in_galois_field(new_num);
+        new_num = new_num ^ num;
+    }
+
+    if n == 13{
+        new_num = double_in_galois_field(num);
+        new_num = new_num ^ num;
+        for _i in 0..2{
+            new_num = double_in_galois_field(new_num);
+        }
+        new_num = new_num ^ num;
+    }
+
+    if n == 14{
+        new_num = double_in_galois_field(num);
+        for _i in 0..2{
+            new_num = new_num ^ num;
+            new_num = double_in_galois_field(new_num);
+        }
+    }
+
     return new_num;
 }
 
@@ -196,16 +288,11 @@ fn mix_column(state: [[u8; 4]; 4]) -> [[u8; 4]; 4]{
         [3, 1, 1, 2]
     ];
 
-    let mut new_state:[[u8; 4]; 4] = [
-        [0, 0, 0, 0],
-        [0, 0, 0, 0],
-        [0, 0, 0, 0],
-        [0, 0, 0, 0]
-    ];
+    let mut new_state:[[u8; 4]; 4] = [[0u8; 4]; 4];
 
     for i in 0..4 {
         let col = [state[i][0], state[i][1], state[i][2], state[i][3]];
-        
+
         new_state[i][0] = galois_mul(col[0], mix_matrix[0][0]) ^ galois_mul(col[1], mix_matrix[0][1]) ^ galois_mul(col[2], mix_matrix[0][2]) ^ galois_mul(col[3], mix_matrix[0][3]);
 
         new_state[i][1] = galois_mul(col[0], mix_matrix[1][0]) ^ galois_mul(col[1], mix_matrix[1][1]) ^ galois_mul(col[2], mix_matrix[1][2]) ^ galois_mul(col[3], mix_matrix[1][3]);
@@ -214,6 +301,32 @@ fn mix_column(state: [[u8; 4]; 4]) -> [[u8; 4]; 4]{
 
         new_state[i][3] = galois_mul(col[0], mix_matrix[3][0]) ^ galois_mul(col[1], mix_matrix[3][1]) ^ galois_mul(col[2], mix_matrix[3][2]) ^ galois_mul(col[3], mix_matrix[3][3]);
 
+    }
+
+    return new_state;
+}
+
+fn inv_mix_column(state: [[u8; 4]; 4]) -> [[u8; 4]; 4]{
+
+    let inv_mix_matrix:[[u8; 4]; 4] = [
+        [14, 11, 13, 9],
+        [9, 14, 11, 13],
+        [13, 9, 14, 11],
+        [11, 13, 9, 14]
+    ];
+
+    let mut new_state:[[u8; 4]; 4] = [[0u8; 4]; 4];
+
+    for i in 0..4 {
+        let col = [state[i][0], state[i][1], state[i][2], state[i][3]];
+
+        new_state[i][0] = galois_mul(col[0], inv_mix_matrix[0][0]) ^ galois_mul(col[1], inv_mix_matrix[0][1]) ^ galois_mul(col[2], inv_mix_matrix[0][2]) ^ galois_mul(col[3], inv_mix_matrix[0][3]);
+
+        new_state[i][1] = galois_mul(col[0], inv_mix_matrix[1][0]) ^ galois_mul(col[1], inv_mix_matrix[1][1]) ^ galois_mul(col[2], inv_mix_matrix[1][2]) ^ galois_mul(col[3], inv_mix_matrix[1][3]);
+
+        new_state[i][2] = galois_mul(col[0], inv_mix_matrix[2][0]) ^ galois_mul(col[1], inv_mix_matrix[2][1]) ^ galois_mul(col[2], inv_mix_matrix[2][2]) ^ galois_mul(col[3], inv_mix_matrix[2][3]);
+
+        new_state[i][3] = galois_mul(col[0], inv_mix_matrix[3][0]) ^ galois_mul(col[1], inv_mix_matrix[3][1]) ^ galois_mul(col[2], inv_mix_matrix[3][2]) ^ galois_mul(col[3], inv_mix_matrix[3][3]);
 
     }
 
@@ -227,6 +340,27 @@ fn add_round_key(mut state: [[u8; 4]; 4], key: [[u8; 4]; 4]) -> [[u8; 4]; 4]{
             state[i][j] = state[i][j] ^ key[i][j];
         }
     }
+    return state;
+}
+
+fn decrypt_block(key: [u8; 32], mut state: [[u8; 4]; 4]) -> [[u8; 4]; 4]{
+    let round_keys:[[[u8; 4]; 4]; 15] = key_expansion(key);
+
+    state = add_round_key(state, round_keys[14]);
+    state = inv_shift_row(state);
+    state = inv_sub_bytes(state);
+
+    for i in (1..14).rev(){
+        println!("{:?}", i);
+        state = add_round_key(state, round_keys[i]);
+        state = inv_mix_column(state);
+        state = inv_shift_row(state);
+        state = inv_sub_bytes(state);
+
+    }
+
+    state = add_round_key(state, round_keys[0]);
+
     return state;
 }
 
@@ -333,5 +467,12 @@ fn main() {
     print_state_hex(ciphertext);
 
     println!("ciphertext: {}", array_to_hex_string(ciphertext));
+
+    let plaintext = decrypt_block(key, ciphertext);
+
+    println!("plaintext");
+    print_state_hex(plaintext);
+
+    println!("plaintext: {}", array_to_hex_string(plaintext));
 
 }
