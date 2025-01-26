@@ -395,6 +395,91 @@ fn encrypt(key: &str, message: &str) -> String{
 
 }
 
+
+fn hex_to_vec_matrix(message: String) -> Vec<[[u8; 4]; 4]> {
+    let mut message_in_matrix = vec![];
+    let num_of_block = message.len() / 32;
+
+    for i in 0..num_of_block{
+        println!("in");
+        let block = &message[i * 32..(i + 1) * 32];
+        println!("{:?}", block);
+        let mut tmp_matrix = [[0u8; 4]; 4];
+
+        for (j, byte) in block.as_bytes().chunks(2).enumerate() {
+            let hex_str = std::str::from_utf8(byte).unwrap_or("00");
+            let value = u8::from_str_radix(hex_str, 16).unwrap_or(0);
+
+            tmp_matrix[j / 4][j % 4] = value;
+            println!("tmp");
+            print_state_hex(tmp_matrix);
+        }
+
+        message_in_matrix.push(tmp_matrix);
+    }
+
+    return message_in_matrix;
+}
+
+fn encrypt_ctr(key: &str, mut message: &str) -> String{
+
+    let message = pad(message);
+
+    let mut iv =  [0u8; 16];
+    OsRng.fill_bytes(&mut iv);
+
+    let mut counter:u64 = 0;
+
+    let mut vec_of_state = hex_to_vec_matrix(message);
+
+    let key = hex_key_to_u8_array(key).unwrap();
+    let mut ciphertext = vec![];
+
+    let mut iv_and_count = [[0u8; 4]; 4];
+
+    for i in 0..2{
+        for j in 0..4{
+            iv_and_count[i][j] = iv[i * 4 + j];
+        }
+    }
+
+    for block in vec_of_state.iter() {
+        let counter_bytes = counter.to_be_bytes();
+
+        for i in 0..2{
+            for j in 0..4{
+                iv_and_count[i + 2][j] = counter_bytes[i * 4 + j];
+            }
+        }
+
+        let encrypted_block = add_round_key(encrypt_block(key, iv_and_count), *block);
+
+        ciphertext.push(array_to_hex_string(encrypted_block));
+        counter += 1;
+
+        for row in &iv_and_count {
+            println!("{:?}", row);
+        }
+
+    }
+
+    return ciphertext.join("");
+}
+
+fn encrypt_ecb(key: &str, message: String) -> Vec<String>{
+    let mut vec_of_state = hex_to_vec_matrix(message);
+
+    let key = hex_key_to_u8_array(key).unwrap();
+    let mut ciphertext = vec![];
+
+    for block in vec_of_state.iter() {
+        ciphertext.push(array_to_hex_string(encrypt_block(key, *block)));
+
+    }
+
+    return ciphertext;
+}
+
 fn array_to_hex_string(array: [[u8; 4]; 4]) -> String {
     array
         .iter()
@@ -449,8 +534,37 @@ fn hex_to_u8_array(hex: &str) -> Result<[[u8; 4]; 4], String> {
     Ok(array)
 }
 
+fn pad(mut message: &str) -> String {
+    let mut message = message.to_string();
+    if message.len() % 32 != 0 {
+        let num_to_add = message.len() % 32;
+        message.push_str(&"0".repeat(num_to_add));
+    }
+    //let message: &str = &message;
+    return message;
+}
+
 
 fn main() {
+
+    let mut test_state:[[u8; 4]; 4] = [
+        [99, 71, 162, 240],
+        [242, 10, 34, 92],
+        [45, 38, 49, 76],
+        [212, 212, 212, 213]
+    ];
+
+    println!("start state");
+    print_state_hex(test_state);
+    test_state = sub_bytes(test_state);
+
+    println!("sub bytes ");
+    print_state_hex(test_state);
+    test_state = inv_sub_bytes(test_state);
+
+    println!("inv sub bytes");
+    print_state_hex(test_state);
+
 
     let key = "603deb1015ca71be2b73aef0857d77811f352c073b6108d72d9810a30914dff4";
     let plaintext = "6bc1bee22e409f96e93d7e117393172a";
@@ -474,5 +588,16 @@ fn main() {
     print_state_hex(plaintext);
 
     println!("plaintext: {}", array_to_hex_string(plaintext));
+
+    let plaintext = "6bc1bee22e409f96e93d7e117393172a6bc1bee22e409f96e93d7e117393172a6bc1bee22e409f96e9393172a6bc1bee22e409f96e93d7e11739317";
+    let key = "603deb1015ca71be2b73aef0857d77811f352c073b6108d72d9810a30914dff4";
+
+    let ciphertext = encrypt_ctr(key, plaintext);
+
+    println!("ciphertext: {:?}", ciphertext);
+
+    let aes_key = generate_aes_key();
+
+    println!("key: {:?}", aes_key);
 
 }
