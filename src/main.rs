@@ -1,6 +1,7 @@
 use rand::rngs::OsRng;
 use rand::RngCore;
 use std::str;
+use hex;
 
 const S_BOX: [[u8; 16]; 16] = [
     [0x63, 0x7c, 0x77, 0x7b, 0xf2, 0x6b, 0x6f, 0xc5, 0x30, 0x01, 0x67, 0x2b, 0xfe, 0xd7, 0xab, 0x76],
@@ -21,7 +22,7 @@ const S_BOX: [[u8; 16]; 16] = [
     [0x8c, 0xa1, 0x89, 0x0d, 0xbf, 0xe6, 0x42, 0x68, 0x41, 0x99, 0x2d, 0x0f, 0xb0, 0x54, 0xbb, 0x16],
 ];
 
-const INV_S_BOX: [[u8;16];16] = [
+const INV_S_BOX: [[u8; 16]; 16] = [
     [0x52, 0x09, 0x6a, 0xd5, 0x30, 0x36, 0xa5, 0x38, 0xbf, 0x40, 0xa3, 0x9e, 0x81, 0xf3, 0xd7, 0xfb],
     [0x7c, 0xe3, 0x39, 0x82, 0x9b, 0x2f, 0xff, 0x87, 0x34, 0x8e, 0x43, 0x44, 0xc4, 0xde, 0xe9, 0xcb],
     [0x54, 0x7b, 0x94, 0x32, 0xa6, 0xc2, 0x23, 0x3d, 0xee, 0x4c, 0x95, 0x0b, 0x42, 0xfa, 0xc3, 0x4e],
@@ -37,10 +38,9 @@ const INV_S_BOX: [[u8;16];16] = [
     [0x1f, 0xdd, 0xa8, 0x33, 0x88, 0x07, 0xc7, 0x31, 0xb1, 0x12, 0x10, 0x59, 0x27, 0x80, 0xec, 0x5f],
     [0x60, 0x51, 0x7f, 0xa9, 0x19, 0xb5, 0x4a, 0x0d, 0x2d, 0xe5, 0x7a, 0x9f, 0x93, 0xc9, 0x9c, 0xef],
     [0xa0, 0xe0, 0x3b, 0x4d, 0xae, 0x2a, 0xf5, 0xb0, 0xc8, 0xeb, 0xbb, 0x3c, 0x83, 0x53, 0x99, 0x61],
-    [0x17, 0x2b, 0x04, 0x7e, 0xba, 0x77, 0xd6, 0x26, 0xe1, 0x69, 0x14, 0x63, 0x55, 0x21, 0x0c, 0x7d] ];
+    [0x17, 0x2b, 0x04, 0x7e, 0xba, 0x77, 0xd6, 0x26, 0xe1, 0x69, 0x14, 0x63, 0x55, 0x21, 0x0c, 0x7d]];
 
 const RCON: [u8; 14] = [0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80, 0x1B, 0x36, 0x6c, 0xd8, 0xab, 0x4d];
-
 
 
 fn generate_aes_key() -> [u8; 32] {
@@ -49,12 +49,12 @@ fn generate_aes_key() -> [u8; 32] {
     key
 }
 
-fn rot_word(word: [u8; 4]) -> [u8; 4]{
-    return [word[1], word[2], word[3], word[0]]
+fn rot_word(word: [u8; 4]) -> [u8; 4] {
+    return [word[1], word[2], word[3], word[0]];
 }
 
-fn sub_word(mut word: [u8; 4]) -> [u8; 4]{
-    for byte in word.iter_mut(){
+fn sub_word(mut word: [u8; 4]) -> [u8; 4] {
+    for byte in word.iter_mut() {
         *byte = find_s_box_sub(*byte)
     }
     return word;
@@ -69,57 +69,49 @@ fn key_expansion(key: [u8; 32]) -> [[[u8; 4]; 4]; 15] {
 
     for i in 0..8 {
         round_keys[i] = [key[4 * i], key[4 * i + 1], key[4 * i + 2], key[4 * i + 3]];
-
     }
 
     for i in 8..60 {
         let mut temp = round_keys[i];
 
-        if i % 8 == 0{
-
-            let mut rcon = [0u8;4];
-            rcon[0] = RCON[(i/8) - 1];
-            temp = xor_words(round_keys[i - 8], sub_word(rot_word(round_keys[i - 1]))) ;
-            temp[0] = temp[0] ^ RCON[(i/8) - 1];
+        if i % 8 == 0 {
+            let mut rcon = [0u8; 4];
+            rcon[0] = RCON[(i / 8) - 1];
+            temp = xor_words(round_keys[i - 8], sub_word(rot_word(round_keys[i - 1])));
+            temp[0] = temp[0] ^ RCON[(i / 8) - 1];
             round_keys[i] = temp;
-
-        }
-        else if i % 8 == 4{
+        } else if i % 8 == 4 {
             round_keys[i] = xor_words(sub_word(round_keys[i - 1]), round_keys[i - 8]);
-        }
-        else{
+        } else {
             round_keys[i] = xor_words(round_keys[i - 8], round_keys[i - 1]);
         }
-
     }
 
     let mut expanded_states = [[[0u8; 4]; 4]; 15];
 
-    expanded_states[0] = [round_keys[0], round_keys[1], round_keys[2],round_keys[3]];
+    expanded_states[0] = [round_keys[0], round_keys[1], round_keys[2], round_keys[3]];
 
     for i in 1..15 {
-        expanded_states[i] = [round_keys[i * 4], round_keys[i * 4 + 1], round_keys[i * 4 + 2 ],round_keys[i * 4 + 3]];
+        expanded_states[i] = [round_keys[i * 4], round_keys[i * 4 + 1], round_keys[i * 4 + 2], round_keys[i * 4 + 3]];
     }
 
     return expanded_states;
 }
 
 
-fn find_s_box_sub(byte: u8) -> u8{
-    let row =  ((byte >> 4) & 0xF) as usize;
+fn find_s_box_sub(byte: u8) -> u8 {
+    let row = ((byte >> 4) & 0xF) as usize;
     let col = (byte & 0xF) as usize;
     return S_BOX[row][col];
-
 }
 
-fn find_inv_s_box_sub(byte: u8) -> u8{
-    let row =  ((byte >> 4) & 0xF) as usize;
+fn find_inv_s_box_sub(byte: u8) -> u8 {
+    let row = ((byte >> 4) & 0xF) as usize;
     let col = (byte & 0xF) as usize;
     return INV_S_BOX[row][col];
-
 }
 
-fn sub_bytes(mut state: [[u8; 4]; 4]) -> [[u8; 4]; 4]{
+fn sub_bytes(mut state: [[u8; 4]; 4]) -> [[u8; 4]; 4] {
     for row in state.iter_mut() {
         for byte in row.iter_mut() {
             *byte = find_s_box_sub(*byte);
@@ -128,7 +120,7 @@ fn sub_bytes(mut state: [[u8; 4]; 4]) -> [[u8; 4]; 4]{
     return state;
 }
 
-fn inv_sub_bytes(mut state: [[u8; 4]; 4]) -> [[u8; 4]; 4]{
+fn inv_sub_bytes(mut state: [[u8; 4]; 4]) -> [[u8; 4]; 4] {
     for row in state.iter_mut() {
         for byte in row.iter_mut() {
             *byte = find_inv_s_box_sub(*byte);
@@ -137,19 +129,19 @@ fn inv_sub_bytes(mut state: [[u8; 4]; 4]) -> [[u8; 4]; 4]{
     return state;
 }
 
-fn rotate_row(mut row: [u8; 4], n: usize) -> [u8; 4]{
+fn rotate_row(mut row: [u8; 4], n: usize) -> [u8; 4] {
     row.rotate_left(n);
     return row;
 }
 
-fn _shift_row(mut state: [[u8; 4]; 4]) -> [[u8; 4]; 4]{
+fn _shift_row(mut state: [[u8; 4]; 4]) -> [[u8; 4]; 4] {
     for i in 1..4 {
         state[i] = rotate_row(state[i], i);
     }
     return state;
 }
 
-fn shift_row(mut state: [[u8; 4]; 4]) -> [[u8; 4]; 4]{
+fn shift_row(mut state: [[u8; 4]; 4]) -> [[u8; 4]; 4] {
     let temp_state = state.clone();
 
     state[0][1] = temp_state[1][1];
@@ -170,7 +162,7 @@ fn shift_row(mut state: [[u8; 4]; 4]) -> [[u8; 4]; 4]{
     return state;
 }
 
-fn inv_shift_row(mut state: [[u8; 4]; 4]) -> [[u8; 4]; 4]{
+fn inv_shift_row(mut state: [[u8; 4]; 4]) -> [[u8; 4]; 4] {
     let temp_state = state.clone();
 
     state[0][1] = temp_state[3][1];
@@ -192,8 +184,7 @@ fn inv_shift_row(mut state: [[u8; 4]; 4]) -> [[u8; 4]; 4]{
 }
 
 
-
-fn print_state(state: [[u8; 4]; 4]){
+fn print_state(state: [[u8; 4]; 4]) {
     for row in state.iter() {
         println!("{:?}", row);
     }
@@ -211,45 +202,45 @@ fn print_state_hex(state: [[u8; 4]; 4]) {
 }
 
 
-fn double_in_galois_field(mut num : u8) -> u8{
+fn double_in_galois_field(mut num: u8) -> u8 {
     let msb = num & 0b1000_0000;
     num <<= 1;
-    if msb != 0{
-        num = num ^  0x1B;
+    if msb != 0 {
+        num = num ^ 0x1B;
     }
     return num;
 }
 
 
-fn galois_mul(mut num: u8, n: u8) -> u8{
-    if n == 1{
+fn galois_mul(mut num: u8, n: u8) -> u8 {
+    if n == 1 {
         return num;
     }
 
     let mut new_num = num;
 
-    if n == 2{
+    if n == 2 {
         new_num = double_in_galois_field(num);
         return new_num;
     }
 
-    if n == 3{
+    if n == 3 {
         new_num = double_in_galois_field(num);
-     new_num = new_num ^ num;
+        new_num = new_num ^ num;
     }
 
-    if n == 9{
+    if n == 9 {
         new_num = num.clone();
-        for _i in 0..3{
+        for _i in 0..3 {
             new_num = double_in_galois_field(new_num);
         }
 
         new_num = new_num ^ num;
     }
 
-    if n == 11{
+    if n == 11 {
         new_num = num.clone();
-        for _i in 0..2{
+        for _i in 0..2 {
             new_num = double_in_galois_field(new_num);
         }
         new_num = new_num ^ num;
@@ -257,18 +248,18 @@ fn galois_mul(mut num: u8, n: u8) -> u8{
         new_num = new_num ^ num;
     }
 
-    if n == 13{
+    if n == 13 {
         new_num = double_in_galois_field(num);
         new_num = new_num ^ num;
-        for _i in 0..2{
+        for _i in 0..2 {
             new_num = double_in_galois_field(new_num);
         }
         new_num = new_num ^ num;
     }
 
-    if n == 14{
+    if n == 14 {
         new_num = double_in_galois_field(num);
-        for _i in 0..2{
+        for _i in 0..2 {
             new_num = new_num ^ num;
             new_num = double_in_galois_field(new_num);
         }
@@ -278,17 +269,15 @@ fn galois_mul(mut num: u8, n: u8) -> u8{
 }
 
 
-
-fn mix_column(state: [[u8; 4]; 4]) -> [[u8; 4]; 4]{
-
-    let mix_matrix:[[u8; 4]; 4] = [
+fn mix_column(state: [[u8; 4]; 4]) -> [[u8; 4]; 4] {
+    let mix_matrix: [[u8; 4]; 4] = [
         [2, 3, 1, 1],
         [1, 2, 3, 1],
         [1, 1, 2, 3],
         [3, 1, 1, 2]
     ];
 
-    let mut new_state:[[u8; 4]; 4] = [[0u8; 4]; 4];
+    let mut new_state: [[u8; 4]; 4] = [[0u8; 4]; 4];
 
     for i in 0..4 {
         let col = [state[i][0], state[i][1], state[i][2], state[i][3]];
@@ -300,22 +289,20 @@ fn mix_column(state: [[u8; 4]; 4]) -> [[u8; 4]; 4]{
         new_state[i][2] = galois_mul(col[0], mix_matrix[2][0]) ^ galois_mul(col[1], mix_matrix[2][1]) ^ galois_mul(col[2], mix_matrix[2][2]) ^ galois_mul(col[3], mix_matrix[2][3]);
 
         new_state[i][3] = galois_mul(col[0], mix_matrix[3][0]) ^ galois_mul(col[1], mix_matrix[3][1]) ^ galois_mul(col[2], mix_matrix[3][2]) ^ galois_mul(col[3], mix_matrix[3][3]);
-
     }
 
     return new_state;
 }
 
-fn inv_mix_column(state: [[u8; 4]; 4]) -> [[u8; 4]; 4]{
-
-    let inv_mix_matrix:[[u8; 4]; 4] = [
+fn inv_mix_column(state: [[u8; 4]; 4]) -> [[u8; 4]; 4] {
+    let inv_mix_matrix: [[u8; 4]; 4] = [
         [14, 11, 13, 9],
         [9, 14, 11, 13],
         [13, 9, 14, 11],
         [11, 13, 9, 14]
     ];
 
-    let mut new_state:[[u8; 4]; 4] = [[0u8; 4]; 4];
+    let mut new_state: [[u8; 4]; 4] = [[0u8; 4]; 4];
 
     for i in 0..4 {
         let col = [state[i][0], state[i][1], state[i][2], state[i][3]];
@@ -327,14 +314,13 @@ fn inv_mix_column(state: [[u8; 4]; 4]) -> [[u8; 4]; 4]{
         new_state[i][2] = galois_mul(col[0], inv_mix_matrix[2][0]) ^ galois_mul(col[1], inv_mix_matrix[2][1]) ^ galois_mul(col[2], inv_mix_matrix[2][2]) ^ galois_mul(col[3], inv_mix_matrix[2][3]);
 
         new_state[i][3] = galois_mul(col[0], inv_mix_matrix[3][0]) ^ galois_mul(col[1], inv_mix_matrix[3][1]) ^ galois_mul(col[2], inv_mix_matrix[3][2]) ^ galois_mul(col[3], inv_mix_matrix[3][3]);
-
     }
 
     return new_state;
 }
 
 
-fn add_round_key(mut state: [[u8; 4]; 4], key: [[u8; 4]; 4]) -> [[u8; 4]; 4]{
+fn add_round_key(mut state: [[u8; 4]; 4], key: [[u8; 4]; 4]) -> [[u8; 4]; 4] {
     for i in 0..4 {
         for j in 0..4 {
             state[i][j] = state[i][j] ^ key[i][j];
@@ -343,20 +329,18 @@ fn add_round_key(mut state: [[u8; 4]; 4], key: [[u8; 4]; 4]) -> [[u8; 4]; 4]{
     return state;
 }
 
-fn decrypt_block(key: [u8; 32], mut state: [[u8; 4]; 4]) -> [[u8; 4]; 4]{
-    let round_keys:[[[u8; 4]; 4]; 15] = key_expansion(key);
+fn decrypt_block(key: [u8; 32], mut state: [[u8; 4]; 4]) -> [[u8; 4]; 4] {
+    let round_keys: [[[u8; 4]; 4]; 15] = key_expansion(key);
 
     state = add_round_key(state, round_keys[14]);
     state = inv_shift_row(state);
     state = inv_sub_bytes(state);
 
-    for i in (1..14).rev(){
-        println!("{:?}", i);
+    for i in (1..14).rev() {
         state = add_round_key(state, round_keys[i]);
         state = inv_mix_column(state);
         state = inv_shift_row(state);
         state = inv_sub_bytes(state);
-
     }
 
     state = add_round_key(state, round_keys[0]);
@@ -364,12 +348,12 @@ fn decrypt_block(key: [u8; 32], mut state: [[u8; 4]; 4]) -> [[u8; 4]; 4]{
     return state;
 }
 
-fn encrypt_block(key: [u8; 32], mut state: [[u8; 4]; 4]) -> [[u8; 4]; 4]{
-    let round_keys:[[[u8; 4]; 4]; 15] = key_expansion(key);
+fn encrypt_block(key: [u8; 32], mut state: [[u8; 4]; 4]) -> [[u8; 4]; 4] {
+    let round_keys: [[[u8; 4]; 4]; 15] = key_expansion(key);
 
     state = add_round_key(state, round_keys[0]);
 
-    for i in 1..14{
+    for i in 1..14 {
         state = sub_bytes(state);
         state = shift_row(state);
         state = mix_column(state);
@@ -384,7 +368,7 @@ fn encrypt_block(key: [u8; 32], mut state: [[u8; 4]; 4]) -> [[u8; 4]; 4]{
 }
 
 
-fn encrypt(key: &str, message: &str) -> String{
+fn encrypt(key: &str, message: &str) -> String {
     let key = hex_key_to_u8_array(key).unwrap();
 
     let message = utf8_to_u8_array(message).unwrap();
@@ -392,7 +376,6 @@ fn encrypt(key: &str, message: &str) -> String{
     let ciphertext = encrypt_block(key, message);
 
     return array_to_hex_string(ciphertext);
-
 }
 
 
@@ -400,10 +383,8 @@ fn hex_to_vec_matrix(message: String) -> Vec<[[u8; 4]; 4]> {
     let mut message_in_matrix = vec![];
     let num_of_block = message.len() / 32;
 
-    for i in 0..num_of_block{
-        println!("in");
+    for i in 0..num_of_block {
         let block = &message[i * 32..(i + 1) * 32];
-        println!("{:?}", block);
         let mut tmp_matrix = [[0u8; 4]; 4];
 
         for (j, byte) in block.as_bytes().chunks(2).enumerate() {
@@ -411,8 +392,7 @@ fn hex_to_vec_matrix(message: String) -> Vec<[[u8; 4]; 4]> {
             let value = u8::from_str_radix(hex_str, 16).unwrap_or(0);
 
             tmp_matrix[j / 4][j % 4] = value;
-            println!("tmp");
-            print_state_hex(tmp_matrix);
+
         }
 
         message_in_matrix.push(tmp_matrix);
@@ -421,24 +401,28 @@ fn hex_to_vec_matrix(message: String) -> Vec<[[u8; 4]; 4]> {
     return message_in_matrix;
 }
 
-fn encrypt_ctr(key: &str, mut message: &str) -> String{
-
+fn encrypt_ctr(key: &str, mut message: &str) -> String {
     let message = pad(message);
 
-    let mut iv =  [0u8; 16];
+    //let message = message.to_string();
+
+    let mut iv = [0u8; 16];
     OsRng.fill_bytes(&mut iv);
 
-    let mut counter:u64 = 0;
+    let mut counter: u64 = 0;
 
     let mut vec_of_state = hex_to_vec_matrix(message);
 
     let key = hex_key_to_u8_array(key).unwrap();
     let mut ciphertext = vec![];
 
+    let hex_iv: String = iv.iter().map(|b| format!("{:02x}", b)).collect();
+    ciphertext.push(hex_iv);
+
     let mut iv_and_count = [[0u8; 4]; 4];
 
-    for i in 0..2{
-        for j in 0..4{
+    for i in 0..2 {
+        for j in 0..4 {
             iv_and_count[i][j] = iv[i * 4 + j];
         }
     }
@@ -446,8 +430,8 @@ fn encrypt_ctr(key: &str, mut message: &str) -> String{
     for block in vec_of_state.iter() {
         let counter_bytes = counter.to_be_bytes();
 
-        for i in 0..2{
-            for j in 0..4{
+        for i in 0..2 {
+            for j in 0..4 {
                 iv_and_count[i + 2][j] = counter_bytes[i * 4 + j];
             }
         }
@@ -457,16 +441,12 @@ fn encrypt_ctr(key: &str, mut message: &str) -> String{
         ciphertext.push(array_to_hex_string(encrypted_block));
         counter += 1;
 
-        for row in &iv_and_count {
-            println!("{:?}", row);
-        }
-
     }
 
     return ciphertext.join("");
 }
 
-fn encrypt_ecb(key: &str, message: String) -> Vec<String>{
+fn encrypt_ecb(key: &str, message: String) -> Vec<String> {
     let mut vec_of_state = hex_to_vec_matrix(message);
 
     let key = hex_key_to_u8_array(key).unwrap();
@@ -474,11 +454,51 @@ fn encrypt_ecb(key: &str, message: String) -> Vec<String>{
 
     for block in vec_of_state.iter() {
         ciphertext.push(array_to_hex_string(encrypt_block(key, *block)));
-
     }
 
     return ciphertext;
 }
+
+fn decrypt_ctr(key: &str, ciphertext: String) -> String {
+
+    let iv = &hex_to_bytes_vec(&ciphertext)[0..16];
+    let message = ciphertext[16..].to_string();
+
+    let message = ciphertext[32..].to_string();
+
+
+
+    let mut counter: u64 = 0;
+    let mut plaintext = vec![];
+    let key = hex_key_to_u8_array(key).unwrap();
+    let mut vec_of_state = hex_to_vec_matrix(message);
+    let mut iv_and_count = [[0u8; 4]; 4];
+
+    for i in 0..2 {
+        for j in 0..4 {
+            iv_and_count[i][j] = iv[i * 4 + j];
+        }
+    }
+
+    for block in vec_of_state.iter() {
+        let counter_bytes = counter.to_be_bytes();
+
+        for i in 0..2 {
+            for j in 0..4 {
+                iv_and_count[i + 2][j] = counter_bytes[i * 4 + j];
+            }
+        }
+
+        let encrypted_block = add_round_key(encrypt_block(key, iv_and_count), *block);
+
+        plaintext.push(array_to_hex_string(encrypted_block));
+        counter += 1;
+
+    }
+
+    return unpad(plaintext.join("").as_str());
+}
+
 
 fn array_to_hex_string(array: [[u8; 4]; 4]) -> String {
     array
@@ -519,85 +539,52 @@ fn hex_key_to_u8_array(hex: &str) -> Result<[u8; 32], String> {
     Ok(array)
 }
 
-fn hex_to_u8_array(hex: &str) -> Result<[[u8; 4]; 4], String> {
-    if hex.len() != 32 {
-        return Err("the string must be 32 characters.".to_string());
+
+fn pad(mut message: &str)-> String {
+
+    let mut message = message.to_string();
+
+    if message.len() % 32 == 0 {
+        let num_to_add = 16;
+        let pad_value = format!("{:02x}", num_to_add);
+        message.push_str(pad_value.repeat(num_to_add).as_str());
     }
 
-    let mut array = [[0u8; 4]; 4];
-    for (i, chunk) in hex.as_bytes().chunks(2).enumerate() {
-        let hex_str = std::str::from_utf8(chunk).map_err(|_| "Non-UTF-8 valid string.".to_string())?;
-        let byte = u8::from_str_radix(hex_str, 16).map_err(|_| format!("Unable to convert '{}' in u8.", hex_str))?;
-        array[i / 4][i % 4] = byte;
+    else if message.len() % 32 != 0 {
+        let num_to_add = (32 - message.len() % 32) / 2;
+        let pad_value = format!("{:02x}", num_to_add);
+        message.push_str(pad_value.repeat(num_to_add).as_str());
     }
 
-    Ok(array)
+    return message;
 }
 
-fn pad(mut message: &str) -> String {
-    let mut message = message.to_string();
-    if message.len() % 32 != 0 {
-        let num_to_add = message.len() % 32;
-        message.push_str(&"0".repeat(num_to_add));
-    }
-    //let message: &str = &message;
-    return message;
+fn unpad(message: &str) -> String {
+    let message_vec = message;
+    let pad_num: String = message_vec.chars().rev().take(2).collect::<Vec<_>>().into_iter().rev().collect();
+    let mut pad_num = hex::decode(pad_num).unwrap();
+    let pad_num = pad_num[0]  as usize;
+    message_vec.chars().take(message_vec.len() - pad_num*2).collect()
+}
+
+fn hex_to_bytes_vec(hex: &str) -> Vec<u8> {
+    (0..hex.len())
+        .step_by(2)
+        .map(|i| u8::from_str_radix(&hex[i..i + 2], 16).expect("Hex invalid"))
+        .collect()
 }
 
 
 fn main() {
 
-    let mut test_state:[[u8; 4]; 4] = [
-        [99, 71, 162, 240],
-        [242, 10, 34, 92],
-        [45, 38, 49, 76],
-        [212, 212, 212, 213]
-    ];
-
-    println!("start state");
-    print_state_hex(test_state);
-    test_state = sub_bytes(test_state);
-
-    println!("sub bytes ");
-    print_state_hex(test_state);
-    test_state = inv_sub_bytes(test_state);
-
-    println!("inv sub bytes");
-    print_state_hex(test_state);
-
-
-    let key = "603deb1015ca71be2b73aef0857d77811f352c073b6108d72d9810a30914dff4";
-    let plaintext = "6bc1bee22e409f96e93d7e117393172a";
-
-    let key = hex_key_to_u8_array(key).unwrap();
-    println!("key{:?}", key);
-    let plaintext = hex_to_u8_array(plaintext).unwrap();
-    println!("plaintext");
-    print_state_hex(plaintext);
-
-    let ciphertext = encrypt_block(key, plaintext);
-
-    println!("ciphertext");
-    print_state_hex(ciphertext);
-
-    println!("ciphertext: {}", array_to_hex_string(ciphertext));
-
-    let plaintext = decrypt_block(key, ciphertext);
-
-    println!("plaintext");
-    print_state_hex(plaintext);
-
-    println!("plaintext: {}", array_to_hex_string(plaintext));
-
-    let plaintext = "6bc1bee22e409f96e93d7e117393172a6bc1bee22e409f96e93d7e117393172a6bc1bee22e409f96e9393172a6bc1bee22e409f96e93d7e11739317";
+    let plaintext = "6bc1bee22e409f96e93d7e117393172a6bc1bee22e409f96e93d7e117393172a6bc1bee22e409f96e93d7e117393172a6bc1bee22e409f";
     let key = "603deb1015ca71be2b73aef0857d77811f352c073b6108d72d9810a30914dff4";
 
     let ciphertext = encrypt_ctr(key, plaintext);
 
     println!("ciphertext: {:?}", ciphertext);
 
-    let aes_key = generate_aes_key();
+    let plaintext = decrypt_ctr(key, ciphertext);
 
-    println!("key: {:?}", aes_key);
-
+    println!("plaintext: {:?}", plaintext);
 }
